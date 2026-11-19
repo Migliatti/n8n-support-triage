@@ -78,7 +78,7 @@ The test loads `workflow.json`, runs the exact code of the Code node against `sa
 - Classification is keyword based. It does not understand context and can misclassify unusual wording.
 - Tickets are not stored. Add a database, a sheet or a ticketing tool node after "Respond" if you need history.
 - No authentication on the webhook. Put it behind your own protection before real use.
-- Not tested inside a live n8n instance yet: the logic is tested outside n8n, and the import should be checked once.
+- Tested end to end on n8n 2.48.5 (self-hosted, local): import, publish, `POST` with a valid request returned `201` with the ticket, and an invalid one returned `400` with the errors. Other n8n versions were not tested.
 
 ## License
 
