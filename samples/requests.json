@@ -1,0 +1,7 @@
+[
+  { "name": "critical outage", "body": { "requester": "Ana", "title": "Sem internet", "description": "A rede está fora do ar e todos estão parados no escritório." }, "expect": { "valid": true, "category": "network", "priority": "critical", "slaHours": 1 } },
+  { "name": "high access", "body": { "requester": "Bruno", "title": "Conta bloqueada", "description": "Preciso entrar hoje na reunião e minha senha foi bloqueada, é urgente." }, "expect": { "valid": true, "category": "access", "priority": "high", "slaHours": 4 } },
+  { "name": "normal software", "body": { "requester": "Carla", "title": "Instalar editor de planilhas", "description": "Quero instalar o programa de planilhas no meu notebook quando possível." }, "expect": { "valid": true, "category": "software", "priority": "normal", "slaHours": 24 } },
+  { "name": "other", "body": { "requester": "Diego", "title": "Dúvida geral", "description": "Gostaria de saber como solicitar uma cadeira nova para a mesa." }, "expect": { "valid": true, "category": "other", "priority": "normal", "slaHours": 24 } },
+  { "name": "invalid", "body": { "requester": "", "title": "", "description": "curto" }, "expect": { "valid": false } }
+]

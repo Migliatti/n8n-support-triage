@@ -1,0 +1,136 @@
+{
+  "name": "Support request triage",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Support intake (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "support-intake",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "support-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Validate and triage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// n8n Code node (\"Run Once for All Items\"): validates and triages a support request.\n// Input: the Webhook node output ({ body: { requester, title, description } }).\n// Output: one item with the ticket record. No external services, no credentials.\n\nconst input = $input.first().json;\nconst body = (input && input.body) || {};\n\nconst clean = (value, max) =>\n  typeof value === 'string' ? value.trim().replace(/\\s+/g, ' ').slice(0, max) : '';\n\nconst requester = clean(body.requester, 80);\nconst title = clean(body.title, 120);\nconst description = clean(body.description, 2000);\n\nconst errors = [];\nif (!requester) errors.push('requester is required');\nif (!title) errors.push('title is required');\nif (description.length < 10) errors.push('description must have at least 10 characters');\n\nif (errors.length > 0) {\n  return [{ json: { valid: false, errors } }];\n}\n\nconst text = `${title} ${description}`.toLowerCase();\nconst has = (words) => words.some((word) => text.includes(word));\n\n// Category: first matching rule wins, order matters.\nconst rules = [\n  { category: 'access', words: ['senha', 'password', 'login', 'acesso', 'access', 'bloquead', 'locked', 'mfa'] },\n  { category: 'network', words: ['wi-fi', 'wifi', 'rede', 'network', 'vpn', 'internet', 'lento', 'slow'] },\n  { category: 'email', words: ['e-mail', 'email', 'outlook', 'teams', 'calendar', 'agenda'] },\n  { category: 'hardware', words: ['impressora', 'printer', 'monitor', 'teclado', 'mouse', 'bateria', 'battery', 'tela quebrada', 'não liga', 'does not turn on'] },\n  { category: 'software', words: ['instalar', 'install', 'erro', 'error', 'travando', 'crash', 'atualiza', 'update', 'licença', 'license'] },\n];\nconst matched = rules.find((rule) => has(rule.words));\nconst category = matched ? matched.category : 'other';\n\n// Priority: impact words raise it. Everything else is normal.\nlet priority = 'normal';\nif (has(['todos', 'everyone', 'toda a equipe', 'whole team', 'fora do ar', 'down', 'parado', 'outage'])) {\n  priority = 'critical';\n} else if (has(['urgente', 'urgent', 'hoje', 'today', 'reunião', 'meeting', 'prazo', 'deadline', 'não consigo trabalhar', 'cannot work'])) {\n  priority = 'high';\n}\n\nconst slaHours = { critical: 1, high: 4, normal: 24 }[priority];\nconst received = new Date();\nconst dueAt = new Date(received.getTime() + slaHours * 3600 * 1000);\nconst stamp = received.toISOString().slice(0, 10).replace(/-/g, '');\nconst ticketId = `T-${stamp}-${received.getTime().toString(36).slice(-5).toUpperCase()}`;\n\nconst firstResponse =\n  priority === 'critical'\n    ? `Hi ${requester}, we received \"${title}\" as CRITICAL. Someone will contact you within ${slaHours} hour.`\n    : `Hi ${requester}, we received \"${title}\" (${category}, ${priority} priority). Expected first response within ${slaHours} hours.`;\n\nreturn [\n  {\n    json: {\n      valid: true,\n      ticketId,\n      requester,\n      title,\n      category,\n      priority,\n      slaHours,\n      receivedAt: received.toISOString(),\n      dueAt: dueAt.toISOString(),\n      firstResponse,\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Is valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Respond 201 (ticket)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        -100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 201
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Respond 400 (errors)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        120
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Support intake (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Validate and triage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and triage": {
+      "main": [
+        [
+          {
+            "node": "Is valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is valid?": {
+      "main": [
+        [
+          {
+            "node": "Respond 201 (ticket)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400 (errors)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
